@@ -78,14 +78,14 @@ namespace UnityFBXExporter
 				Material mat = uniqueMaterials[i];
 
 				// We rename the material if it is being copied
-				string materialName = mat.name;
-				if(copyMaterials)
-					materialName = gameObj.name + "_" + mat.name;
+				//string materialName = mat.name;
+				//if(copyMaterials)
+				//	materialName = gameObj.name + "_" + mat.name;
 
 				int referenceId = Mathf.Abs(mat.GetInstanceID());
 
 				tempObjectSb.AppendLine();
-				tempObjectSb.AppendLine("\tMaterial: " + referenceId + ", \"Material::" + materialName + "\", \"\" {");
+				tempObjectSb.AppendLine("\tMaterial: " + referenceId + ", \"Material::" + mat.name + "\", \"\" {");
 				tempObjectSb.AppendLine("\t\tVersion: 102");
 				tempObjectSb.AppendLine("\t\tShadingModel: \"phong\"");
 				tempObjectSb.AppendLine("\t\tMultiLayer: 0");
@@ -176,7 +176,7 @@ namespace UnityFBXExporter
 				string textureObjects;
 				string textureConnections;
 
-				SerializedTextures(gameObj, newPath, mat, materialName, copyTextures, out textureObjects, out textureConnections);
+				SerializedTextures(gameObj, newPath, mat, /*materialName,*/ copyTextures, out textureObjects, out textureConnections);
 
 				tempObjectSb.Append(textureObjects);
 				tempConnectionsSb.Append(textureConnections);
@@ -196,7 +196,7 @@ namespace UnityFBXExporter
 		/// <param name="materials">Materials that holds all the textures.</param>
 		/// <param name="matObjects">The string with the newly serialized texture file.</param>
 		/// <param name="connections">The string to connect this to the  material.</param>
-		private static void SerializedTextures(GameObject gameObj, string newPath, Material material, string materialName, bool copyTextures, out string objects, out string connections)
+		private static void SerializedTextures(GameObject gameObj, string newPath, Material material, /*string materialName,*/ bool copyTextures, out string objects, out string connections)
 		{
 			// TODO: FBX import currently only supports Diffuse Color and Normal Map
 			// Because it is undocumented, there is no way to easily find out what other textures
@@ -217,12 +217,12 @@ namespace UnityFBXExporter
 			// Serializeds the Main Texture, one of two textures that can be stored in FBX's sysytem
 			if(mainTexture != null)
 			{
-				SerializeOneTexture(gameObj, newPath, material, materialName, materialId, copyTextures, "_MainTex", "DiffuseColor", out newObjects, out newConnections);
+				SerializeOneTexture(gameObj, newPath, material, /*materialName,*/ materialId, copyTextures, "_MainTex", "DiffuseColor", out newObjects, out newConnections);
 				objectsSb.AppendLine(newObjects);
 				connectionsSb.AppendLine(newConnections);
 			}
 
-			if(SerializeOneTexture(gameObj, newPath, material, materialName, materialId, copyTextures, "_BumpMap", "NormalMap", out newObjects, out newConnections))
+			if(SerializeOneTexture(gameObj, newPath, material,/* materialName, */materialId, copyTextures, "_BumpMap", "NormalMap", out newObjects, out newConnections))
 			{
 				objectsSb.AppendLine(newObjects);
 				connectionsSb.AppendLine(newConnections);
@@ -235,7 +235,7 @@ namespace UnityFBXExporter
 		private static bool SerializeOneTexture(GameObject gameObj, 
 		                                        string newPath, 
 		                                        Material material, 
-		                                        string materialName,
+		                                        //string materialName,
 		                                        int materialId,
 		                                        bool copyTextures, 
 		                                        string unityExtension, 
@@ -276,25 +276,25 @@ namespace UnityFBXExporter
 				fullDataFolderPath = fullDataFolderPath.Remove(indexOfAssetsFolder, fullDataFolderPath.Length - indexOfAssetsFolder);
 				
 				string newPathFolder = newPath.Remove(newPath.LastIndexOf('/') + 1, newPath.Length - newPath.LastIndexOf('/') - 1);
-				textureName = gameObj.name + "_" + material.name + unityExtension;
+				textureName = /*gameObj.name + "_" +*/ material.name + unityExtension;
 
-				textureFilePathFullName = fullDataFolderPath + "/" + newPathFolder + textureName + textureExtension;
+				textureFilePathFullName = fullDataFolderPath + "/" + newPathFolder + "Textures/" + textureName + textureExtension;
 			}
 
 			long textureReference = FBXExporter.GetRandomFBXId();
 
 			// TODO - test out different reference names to get one that doesn't load a _MainTex when importing.
 
-			objectsSb.AppendLine("\tTexture: " + textureReference + ", \"Texture::" + materialName + "\", \"\" {");
+			objectsSb.AppendLine("\tTexture: " + textureReference + ", \"Texture::" + material.name + "\", \"\" {");
 			objectsSb.AppendLine("\t\tType: \"TextureVideoClip\"");
 			objectsSb.AppendLine("\t\tVersion: 202");
-			objectsSb.AppendLine("\t\tTextureName: \"Texture::" + materialName + "\"");
+			objectsSb.AppendLine("\t\tTextureName: \"Texture::" + material.name + "\"");
 			objectsSb.AppendLine("\t\tProperties70:  {");
 			objectsSb.AppendLine("\t\t\tP: \"CurrentTextureBlendMode\", \"enum\", \"\", \"\",0");
 			objectsSb.AppendLine("\t\t\tP: \"UVSet\", \"KString\", \"\", \"\", \"map1\"");
 			objectsSb.AppendLine("\t\t\tP: \"UseMaterial\", \"bool\", \"\", \"\",1");
 			objectsSb.AppendLine("\t\t}");
-			objectsSb.AppendLine("\t\tMedia: \"Video::" + materialName + "\"");
+			objectsSb.AppendLine("\t\tMedia: \"Video::" + material.name + "\"");
 
 			// Sets the absolute path for the copied texture
 			objectsSb.Append("\t\tFileName: \"");
@@ -312,7 +312,7 @@ namespace UnityFBXExporter
 			objectsSb.AppendLine("\t\tCropping: 0,0,0,0");
 			objectsSb.AppendLine("\t}");
 			
-			connectionsSb.AppendLine("\t;Texture::" + textureName + ", Material::" + materialName + "\"");
+			connectionsSb.AppendLine("\t;Texture::" + textureName + ", Material::" + material.name + "\"");
 			connectionsSb.AppendLine("\tC: \"OP\"," + textureReference + "," + materialId + ", \"" + textureType + "\""); 
 			
 			connectionsSb.AppendLine();

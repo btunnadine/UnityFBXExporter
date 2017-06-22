@@ -50,7 +50,14 @@ namespace UnityFBXExporter
 			if(copyMaterials)
 				CopyComplexMaterialsToPath(gameObj, newPath, copyTextures);
 
-			string buildMesh = MeshToString(gameObj, newPath, copyMaterials, copyTextures);
+            Renderer[] meshRenderers = gameObj.GetComponentsInChildren<Renderer>();
+#if UNITY_EDITOR
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+#endif
+
+
+            string buildMesh = MeshToString(gameObj, newPath, copyMaterials, copyTextures);
 
 			if(System.IO.File.Exists(newPath))
 				System.IO.File.Delete(newPath);
@@ -447,7 +454,7 @@ namespace UnityFBXExporter
 			// PARENTNAME_ORIGINALMATNAME.mat
 			for(int i = 0; i < everyDistinctMaterial.Length; i++)
 			{
-				string newName = gameObj.name + "_" + everyDistinctMaterial[i].name;
+				string newName = /*gameObj.name + "_" + */everyDistinctMaterial[i].name;
 				string fullPath = materialsPath + "/" + newName + ".mat";
 
 				if(File.Exists(fullPath))
@@ -487,13 +494,30 @@ namespace UnityFBXExporter
 
 				for(int i = 0; i < allNewMaterials.Count; i++)
 				{
-					allNewMaterials[i] = CopyTexturesAndAssignCopiesToMaterial(allNewMaterials[i], texturesPath);
+					allNewMaterials[i] = CopyTexturesAndAssignCopiesToMaterial(allNewMaterials[i], texturesPath, everyDistinctMaterial[i]);
 				}
 			}
 
 			AssetDatabase.Refresh();
+
+            for (int i = 0; i < meshRenderers.Length; i++)
+            {
+                var sharedMaterials = meshRenderers[i].sharedMaterials;
+                for (int n = 0; n < sharedMaterials.Length; n++)
+                {
+                    for (int j = 0; j < everyDistinctMaterial.Count(); j++)
+                    {
+                        if (sharedMaterials[n] == everyDistinctMaterial[j])
+                        {
+                            sharedMaterials[n] = allNewMaterials[j];
+                        }
+                    }                    
+                }
+                meshRenderers[i].sharedMaterials = sharedMaterials;
+                //Debug.Log(meshRenderers[i].gameObject.name);
+            }
 #endif
-		}
+        }
 
 		public static bool CopyAndRenameAsset(Object obj, string newName, string newFolderPath)
 		{
@@ -511,14 +535,36 @@ namespace UnityFBXExporter
 //			}
 
 			string assetPath = AssetDatabase.GetAssetPath(obj);
-			string extension = Path.GetExtension(assetPath);
+            if (!string.IsNullOrEmpty(assetPath))
+            {
+                string extension = Path.GetExtension(assetPath);
 
-			string newFileName = path + newName + extension;
+                string newFileName = path + newName + extension;
 
-			if(File.Exists(newFileName))
-				return false;
+                if (File.Exists(newFileName))
+                    return false;
 
-			return AssetDatabase.CopyAsset(assetPath, newFileName);
+                return AssetDatabase.CopyAsset(assetPath, newFileName);
+            }
+            else
+            {
+                Object o;
+                string extension = ".asset";
+                if (obj is Material)
+                {
+                    o = new Material((obj as Material).shader);
+                    extension = ".mat";
+                }
+                else
+                {
+                    return false;
+                }
+                string newFileName = path + newName + extension;
+                if (File.Exists(newFileName))
+                    return false;
+                AssetDatabase.CreateAsset(o, newFileName);
+                return true;
+            }
 #else
 			return false;
 
@@ -538,28 +584,25 @@ namespace UnityFBXExporter
 			return fileName;
 		}
 
-		private static Material CopyTexturesAndAssignCopiesToMaterial(Material material, string newPath)
+		private static Material CopyTexturesAndAssignCopiesToMaterial(Material material, string newPath, Material sourceMaterial = null) 
 		{
 			if(material.shader.name == "Standard" || material.shader.name == "Standard (Specular setup)")
 			{
-				GetTextureUpdateMaterialWithPath(material, "_MainTex", newPath);
+				GetTextureUpdateMaterialWithPath(material, "_MainTex", newPath, sourceMaterial);
 
 				if(material.shader.name == "Standard")
-					GetTextureUpdateMaterialWithPath(material, "_MetallicGlossMap", newPath);
+					GetTextureUpdateMaterialWithPath(material, "_MetallicGlossMap", newPath, sourceMaterial);
 
 				if(material.shader.name == "Standard (Specular setup)")
-					GetTextureUpdateMaterialWithPath(material, "_SpecGlossMap", newPath);
+					GetTextureUpdateMaterialWithPath(material, "_SpecGlossMap", newPath, sourceMaterial);
 
-				GetTextureUpdateMaterialWithPath(material, "_BumpMap", newPath);
-				GetTextureUpdateMaterialWithPath(material, "_BumpMap", newPath);
-				GetTextureUpdateMaterialWithPath(material, "_BumpMap", newPath);
-				GetTextureUpdateMaterialWithPath(material, "_BumpMap", newPath);
-				GetTextureUpdateMaterialWithPath(material, "_ParallaxMap", newPath);
-				GetTextureUpdateMaterialWithPath(material, "_OcclusionMap", newPath);
-				GetTextureUpdateMaterialWithPath(material, "_EmissionMap", newPath);
-				GetTextureUpdateMaterialWithPath(material, "_DetailMask", newPath);
-				GetTextureUpdateMaterialWithPath(material, "_DetailAlbedoMap", newPath);
-				GetTextureUpdateMaterialWithPath(material, "_DetailNormalMap", newPath);
+				GetTextureUpdateMaterialWithPath(material, "_BumpMap", newPath, sourceMaterial);
+				GetTextureUpdateMaterialWithPath(material, "_ParallaxMap", newPath, sourceMaterial);
+				GetTextureUpdateMaterialWithPath(material, "_OcclusionMap", newPath, sourceMaterial);
+				GetTextureUpdateMaterialWithPath(material, "_EmissionMap", newPath, sourceMaterial);
+				GetTextureUpdateMaterialWithPath(material, "_DetailMask", newPath, sourceMaterial);
+				GetTextureUpdateMaterialWithPath(material, "_DetailAlbedoMap", newPath, sourceMaterial);
+				GetTextureUpdateMaterialWithPath(material, "_DetailNormalMap", newPath, sourceMaterial);
 
 			}
 			else
@@ -568,25 +611,27 @@ namespace UnityFBXExporter
 			return material;
 		}
 
-		/// <summary>
-		/// Copies and renames the texture and assigns it to the material provided.
-		/// NAME FORMAT: Material.name + textureShaderName
-		/// </summary>
-		/// <param name="material">Material.</param>
-		/// <param name="textureShaderName">Texture shader name.</param>
-		/// <param name="newPath">New path.</param>
-		private static void GetTextureUpdateMaterialWithPath(Material material, string textureShaderName, string newPath)
-		{
-			Texture textureInQ = material.GetTexture(textureShaderName);
-			if(textureInQ != null)
-			{
-				string name = material.name + textureShaderName;
-				
-				Texture newTexture = (Texture)CopyAndRenameAssetReturnObject(textureInQ, name, newPath);
-				if(newTexture != null)
-					material.SetTexture(textureShaderName, newTexture);
-			}
-		}
+        /// <summary>
+        /// Copies and renames the texture and assigns it to the material provided.
+        /// NAME FORMAT: Material.name + textureShaderName
+        /// </summary>
+        /// <param name="material">Material.</param>
+        /// <param name="textureShaderName">Texture shader name.</param>
+        /// <param name="newPath">New path.</param>
+        private static void GetTextureUpdateMaterialWithPath(Material material, string textureShaderName, string newPath, Material sourceMaterial = null)
+        {
+            Texture textureInQ = (sourceMaterial ?? material).GetTexture(textureShaderName);
+            if (textureInQ != null)
+            {
+                string name = (sourceMaterial ?? material).name + textureShaderName;
+
+                Texture newTexture = (Texture)CopyAndRenameAssetReturnObject(textureInQ, name, newPath);
+                if (newTexture != null)
+                {
+                    material.SetTexture(textureShaderName, newTexture);
+                }
+            }
+        }
 
 		public static Object CopyAndRenameAssetReturnObject(Object obj, string newName, string newFolderPath)
 		{
@@ -604,17 +649,32 @@ namespace UnityFBXExporter
 			}
 			
 			string assetPath =  AssetDatabase.GetAssetPath(obj);
-			string fileName = GetFileName(assetPath);
-			string extension = fileName.Remove(0, fileName.LastIndexOf('.'));
-			
-			string newFullPathName = path + newName + extension;
-			
-			if(AssetDatabase.CopyAsset(assetPath, newFullPathName) == false)
-				return null;
-			
-			AssetDatabase.Refresh();
-			
-			return AssetDatabase.LoadAssetAtPath(newFullPathName, typeof(Texture));
+            if (!string.IsNullOrEmpty(assetPath))
+            {
+                string fileName = GetFileName(assetPath);
+                string extension = fileName.Remove(0, fileName.LastIndexOf('.'));
+
+                string newFullPathName = path + newName + extension;
+
+                if (AssetDatabase.CopyAsset(assetPath, newFullPathName) == false)
+                    return null;
+
+                AssetDatabase.Refresh();
+
+                return AssetDatabase.LoadAssetAtPath(newFullPathName, typeof(Texture));
+            }
+            else
+            {
+                if (obj is Texture2D)
+                {
+                    string newFullPathName = path + newName + ".png";
+                    var png = (obj as Texture2D).EncodeToPNG();
+                    File.WriteAllBytes(newFullPathName, png);
+                    AssetDatabase.Refresh();
+                    return AssetDatabase.LoadAssetAtPath(newFullPathName, typeof(Texture2D));
+                }
+                return null;
+            }
 			#else
 			return null;
 			#endif
