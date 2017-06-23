@@ -29,6 +29,7 @@ using UnityEngine;
 using System.Collections;
 using System.Text;
 using System.Collections.Generic;
+using System.IO;
 
 namespace UnityFBXExporter
 {
@@ -45,12 +46,18 @@ namespace UnityFBXExporter
         /// <param name="connections">The StringBuidler to create connections for the FBX file.</param>
         /// <param name="parentObject">Parent object, if left null this is the top parent.</param>
         /// <param name="parentModelId">Parent model id, 0 if top parent.</param>
+        //public static long GetMeshToString(GameObject gameObj,
+        //                                   Material[] materials,
+        //                                   ref StringBuilder objects,
+        //                                   ref StringBuilder connections,
+        //                                   GameObject parentObject = null,
+        //                                   long parentModelId = 0)
         public static long GetMeshToString(GameObject gameObj,
-                                           Material[] materials,
-                                           ref StringBuilder objects,
-                                           ref StringBuilder connections,
-                                           GameObject parentObject = null,
-                                           long parentModelId = 0)
+                                   Material[] materials,
+                                   ref StreamWriter objects,
+                                   ref StreamWriter connections,
+                                   GameObject parentObject = null,
+                                   long parentModelId = 0)
         {
             StringBuilder tempObjectSb = new StringBuilder();
             StringBuilder tempConnectionsSb = new StringBuilder();
@@ -478,16 +485,20 @@ namespace UnityFBXExporter
 
 			}
 
+            objects.Write(tempObjectSb.ToString());
+            connections.Write(tempConnectionsSb.ToString());
+
 			// Recursively add all the other objects to the string that has been built.
 			for(int i = 0; i < gameObj.transform.childCount; i++)
 			{
 				GameObject childObject = gameObj.transform.GetChild(i).gameObject;
 
-				FBXUnityMeshGetter.GetMeshToString(childObject, materials, ref tempObjectSb, ref tempConnectionsSb, gameObj, modelId);
+				//FBXUnityMeshGetter.GetMeshToString(childObject, materials, ref tempObjectSb, ref tempConnectionsSb, gameObj, modelId);
+				FBXUnityMeshGetter.GetMeshToString(childObject, materials, ref objects, ref connections, gameObj, modelId);
 			}
 
-			objects.Append(tempObjectSb.ToString());
-			connections.Append(tempConnectionsSb.ToString());
+			//objects.Append(tempObjectSb.ToString());
+			//connections.Append(tempConnectionsSb.ToString());
 
 			return modelId;
 		}
